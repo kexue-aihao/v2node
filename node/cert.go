@@ -16,7 +16,7 @@ import (
 	"github.com/wyx2685/v2node/common/file"
 )
 
-func (c *Controller) renewCertTask(_ context.Context) error {
+func (c *Controller) renewCertTask(ctx context.Context) error {
 	l, err := NewLego(c.info.Common.CertInfo)
 	if err != nil {
 		log.WithField("tag", c.tag).Info("new lego error: ", err)
@@ -27,6 +27,7 @@ func (c *Controller) renewCertTask(_ context.Context) error {
 		log.WithField("tag", c.tag).Info("renew cert error: ", err)
 		return nil
 	}
+	c.reportCertPin(ctx)
 	return nil
 }
 

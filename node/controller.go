@@ -73,6 +73,7 @@ func (c *Controller) Start(x *core.V2Core) error {
 		if err != nil {
 			return fmt.Errorf("request cert error: %s", err)
 		}
+		c.reportCertPin(context.Background())
 	}
 	// Add new tag
 	err = c.server.AddNode(c.tag, node)
