@@ -7,6 +7,12 @@ plain='\033[0m'
 
 cur_dir=$(pwd)
 
+# GitHub 仓库（fork 可改此处或通过环境变量覆盖）
+V2NODE_REPO="${V2NODE_REPO:-kexue-aihao/v2node}"
+V2NODE_BRANCH="${V2NODE_BRANCH:-master}"
+V2NODE_RAW_BASE="https://raw.githubusercontent.com/${V2NODE_REPO}/${V2NODE_BRANCH}"
+V2NODE_GITHUB_BASE="https://github.com/${V2NODE_REPO}"
+
 # check root
 [[ $EUID -ne 0 ]] && echo -e "${red}错误：${plain} 必须使用root用户运行此脚本！\n" && exit 1
 
@@ -107,7 +113,7 @@ before_show_menu() {
 }
 
 install() {
-    bash <(curl -Ls https://raw.githubusercontent.com/wyx2685/v2node/master/script/install.sh)
+    bash <(curl -Ls "${V2NODE_RAW_BASE}/script/install.sh")
     if [[ $? == 0 ]]; then
         if [[ $# == 0 ]]; then
             start
@@ -123,7 +129,7 @@ update() {
     else
         version=$2
     fi
-    bash <(curl -Ls https://raw.githubusercontent.com/wyx2685/v2node/master/script/install.sh) $version
+    bash <(curl -Ls "${V2NODE_RAW_BASE}/script/install.sh") $version
     if [[ $? == 0 ]]; then
         echo -e "${green}更新完成，已自动重启 v2node，请使用 v2node log 查看运行日志${plain}"
         exit
@@ -307,7 +313,7 @@ show_log() {
 }
 
 update_shell() {
-    wget -O /usr/bin/v2node -N --no-check-certificate https://raw.githubusercontent.com/wyx2685/v2node/master/script/v2node.sh
+    wget -O /usr/bin/v2node -N --no-check-certificate "${V2NODE_RAW_BASE}/script/v2node.sh"
     if [[ $? != 0 ]]; then
         echo ""
         echo -e "${red}下载脚本失败，请检查本机能否连接 Github${plain}"
@@ -513,7 +519,7 @@ show_usage() {
 show_menu() {
     echo -e "
   ${green}v2node 后端管理脚本，${plain}${red}不适用于docker${plain}
---- https://github.com/wyx2685/v2node ---
+--- ${V2NODE_GITHUB_BASE} ---
   ${green}0.${plain} 修改配置
 ————————————————
   ${green}1.${plain} 安装 v2node

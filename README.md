@@ -9,7 +9,13 @@ A v2board backend base on moddified xray-core.
 ### 一键安装
 
 ```
-wget -N https://raw.githubusercontent.com/wyx2685/v2node/master/script/install.sh && bash install.sh
+wget -N https://raw.githubusercontent.com/kexue-aihao/v2node/master/script/install.sh && bash install.sh
+```
+
+面板一键安装（带节点参数）：
+
+```
+wget -N https://raw.githubusercontent.com/kexue-aihao/v2node/master/script/install.sh && bash install.sh --api-host "https://你的面板" --node-id 1 --api-key "你的密钥"
 ```
 
 ## 构建
