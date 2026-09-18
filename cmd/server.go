@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	_ "net/http/pprof"
@@ -8,6 +9,7 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -18,8 +20,9 @@ import (
 )
 
 var (
-	config string
-	watch  bool
+	config               string
+	watch                bool
+	errReloadPreparation = errors.New("reload preparation failed")
 )
 
 var serverCommand = cobra.Command{
@@ -123,18 +126,26 @@ func serverHandle(_ *cobra.Command, _ []string) {
 	osSignals := make(chan os.Signal, 1)
 	signal.Notify(osSignals, syscall.SIGINT, syscall.SIGTERM)
 
+	var retryReload <-chan time.Time
 	for {
 		select {
 		case <-osSignals:
 			log.Info("收到退出信号，正在关闭程序...")
 			os.Exit(0)
 		case <-reloadCh:
-			log.Info("收到重启信号，正在重新加载配置...")
-			if err := reload(config, &nodes, &v2core); err != nil {
-				log.WithField("err", err).Panic("重启失败")
-			}
-			log.Info("重启成功")
+		case <-retryReload:
 		}
+		retryReload = nil
+		log.Info("收到重启信号，正在重新加载配置...")
+		if err := reload(config, &nodes, &v2core); err != nil {
+			if errors.Is(err, errReloadPreparation) {
+				log.WithField("err", err).Error("新配置预检失败，保留当前节点，5 秒后重试")
+				retryReload = time.After(5 * time.Second)
+				continue
+			}
+			log.WithField("err", err).Panic("重启失败")
+		}
+		log.Info("重启成功")
 	}
 }
 
@@ -145,17 +156,27 @@ func reload(config string, nodes **node.Node, v2core **core.V2Core) error {
 		oldReloadCh = (*v2core).ReloadCh
 	}
 
-	if err := (*nodes).Close(); err != nil {
-		return err
-	}
-
-	if err := (*v2core).Close(); err != nil {
-		return err
-	}
-
+	// Read and validate the replacement configuration while the current
+	// instance is still running. An editor may briefly expose a partial file;
+	// that must not tear down healthy node connections.
 	newConf := conf.New()
 	if err := newConf.LoadFromPath(config); err != nil {
-		return err
+		return fmt.Errorf("%w: %w", errReloadPreparation, err)
+	}
+	newNodes, err := node.New(newConf.NodeConfigs)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errReloadPreparation, err)
+	}
+
+	if *nodes != nil {
+		if err := (*nodes).Close(); err != nil {
+			return err
+		}
+	}
+	if *v2core != nil {
+		if err := (*v2core).Close(); err != nil {
+			return err
+		}
 	}
 
 	switch newConf.LogConfig.Level {
@@ -179,11 +200,6 @@ func reload(config string, nodes **node.Node, v2core **core.V2Core) error {
 			}
 			log.SetOutput(f)
 		}
-	}
-
-	newNodes, err := node.New(newConf.NodeConfigs)
-	if err != nil {
-		return err
 	}
 
 	newCore := core.New(newConf)
